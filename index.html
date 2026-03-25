@@ -85,8 +85,8 @@
     }
 
     input.inline-input, select.inline-input {
-      padding: 8px 10px;
-      min-width: 88px;
+      padding: 8px 8px;
+      min-width: 60px;
       border-radius: 8px;
     }
 
@@ -270,8 +270,8 @@
     }
 
     .bulk-tools .field {
-      min-width: 120px;
-      flex: 1 1 120px;
+      min-width: 100px;
+      flex: 0 1 100px;
     }
 
     .bulk-tools .actions {
@@ -288,6 +288,39 @@
 
     .track-row-selected {
       background: rgba(34, 197, 94, 0.08);
+    }
+
+    .expandable-cell {
+      position: relative;
+      overflow: visible;
+    }
+
+    .expandable-input {
+      width: 100%;
+      min-width: 0;
+      position: relative;
+      z-index: 1;
+      transition: box-shadow 0.18s ease, background 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .expandable-cell:hover .expandable-input,
+    .expandable-cell:focus-within .expandable-input {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      width: 320px;
+      transform: translateY(-50%);
+      z-index: 8;
+      background: #020617;
+    }
+
+    .expandable-cell:hover .expandable-input {
+      box-shadow: 0 0 0 1px var(--border), 0 8px 20px rgba(0,0,0,0.55);
+    }
+
+    .expandable-cell:focus-within .expandable-input {
+      width: 340px;
+      box-shadow: 0 0 0 1px var(--accent), 0 10px 24px rgba(0,0,0,0.65);
     }
 
     .delete-track-btn {
@@ -394,13 +427,13 @@
           <thead>
             <tr>
               <th class="track-select-cell"><input id="selectAllTracks" type="checkbox" /></th>
-              <th style="width:90px;">Track #</th>
+              <th style="width:70px;">Track #</th>
               <th style="width:180px;">Artist</th>
               <th>Song</th>
-              <th style="width:150px;">BPM</th>
-              <th style="width:160px;">Key</th>
-              <th style="width:120px;">Year</th>
-              <th style="width:180px;">Genre</th>
+              <th style="width:100px;">BPM</th>
+              <th style="width:85px;">Key</th>
+              <th style="width:90px;">Year</th>
+              <th style="width:130px;">Genre</th>
               <th style="width:90px;">Delete</th>
             </tr>
           </thead>
@@ -653,11 +686,15 @@
     }
 
     function createArtistInput(value, trackIndex) {
-      return createTextInput(value, trackIndex, 'artist', 'Artist');
+      const input = createTextInput(value, trackIndex, 'artist', 'Artist');
+      input.classList.add('expandable-input');
+      return input;
     }
 
     function createSongInput(value, trackIndex) {
-      return createTextInput(value, trackIndex, 'title', 'Song');
+      const input = createTextInput(value, trackIndex, 'title', 'Song');
+      input.classList.add('expandable-input');
+      return input;
     }
 
     function createYearInput(value, trackIndex) {
@@ -695,9 +732,11 @@
         tdNumber.textContent = track.number || index + 1;
 
         const tdArtist = document.createElement('td');
+        tdArtist.className = 'expandable-cell';
         tdArtist.appendChild(createArtistInput(track.artist || release.artist || '', index));
 
         const tdTitle = document.createElement('td');
+        tdTitle.className = 'expandable-cell';
         tdTitle.appendChild(createSongInput(track.title || '', index));
 
         const tdBpm = document.createElement('td');
