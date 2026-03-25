@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Record Barcode to CSV</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --border: #4b5563;
+      --input: #0f172a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(31, 41, 55, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input, textarea, button, select {
+      font: inherit;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      background: var(--input);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    input.inline-input, select.inline-input {
+      padding: 8px 10px;
+      min-width: 88px;
+      border-radius: 8px;
+    }
+
+    button {
+      background: var(--accent);
+      color: #052e16;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    button.ghost {
+      background: #334155;
+      color: #fff;
+    }
+
+    button.warning {
+      background: var(--warning);
+      color: #1f1300;
+    }
+
+    button.danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 14px;
+      background: black;
+      border: 1px solid var(--border);
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+    }
+
+    .status, .notice {
+      padding: 10px 12px;
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      white-space: pre-line;
+    }
+
+    .notice.success { border-color: #166534; color: #dcfce7; }
+    .notice.warning { border-color: #a16207; color: #fde68a; }
+    .notice.error { border-color: #b91c1c; color: #fecaca; }
+
+    .album, .session-box {
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+
+    .album h3, .session-title {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .meta, .small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .meta {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      background: #14532d;
+      color: #dcfce7;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .session-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .session-item:last-child {
+      border-bottom: 0;
+    }
+
+    .source-badge, .duplicate-badge {
+      background: #7c2d12;
+      color: #fed7aa;
+    }
+
+    .field-empty {
+      border-color: #6b7280 !important;
+      background: #1f2937 !important;
+      box-shadow: inset 0 0 0 1px rgba(156, 163, 175, 0.25);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .track-editor {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .muted-linkish {
+      color: #93c5fd;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .session-item { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Record Barcode to CSV</h1>
+    <div class="sub">
+      Scan a UPC/EAN barcode on a record sleeve, look up the release, preview the tracks, edit BPM and key inline, batch records into one session, and export a clean CSV. MusicBrainz is used first, with Discogs as a backup when you provide a Discogs token.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row">
+          <div style="flex:1 1 220px;">
+            <label for="barcodeInput">Barcode / UPC / EAN</label>
+            <input id="barcodeInput" placeholder="Scan or type barcode here" />
+          </div>
+          <div style="flex:1 1 220px;">
+            <label for="discogsTokenInput">Discogs User Token (optional backup)</label>
+            <input id="discogsTokenInput" placeholder="Paste Discogs token for backup lookup" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="startCameraBtn">Start Camera Scan</button>
+          <button id="stopCameraBtn" class="ghost" disabled>Stop Camera</button>
+          <button id="lookupBtn" class="secondary">Lookup Release</button>
+          <button id="addToSessionBtn" class="warning" disabled>Add to Session</button>
+        </div>
+
+        <div class="checkbox-row">
+          <input id="enterAddsToSessionToggle" type="checkbox" />
+          <label for="enterAddsToSessionToggle" style="margin:0; color:inherit;">Enter adds current release to session</label>
+        </div>
+
+        <video id="video" playsinline muted></video>
+        <div class="small" style="margin-top:10px;">
+          Camera scan works best in Chrome or Edge on supported devices. If scanning is unavailable, you can still type or paste the barcode manually. Discogs backup lookup requires a Discogs user token.
+        </div>
+
+        <div id="status" class="status" style="margin-top:12px;">Ready.</div>
+        <div id="lookupNotice" class="notice" style="margin-top:12px; display:none;"></div>
+      </div>
+
+      <div class="card">
+        <span class="pill">CSV Preview</span>
+        <div class="row">
+          <button id="downloadCsvBtn" disabled>Download CSV</button>
+          <button id="copyCsvBtn" class="secondary" disabled>Copy CSV</button>
+          <button id="downloadSessionCsvBtn" class="secondary" disabled>Download Session CSV</button>
+          <button id="clearBtn" class="danger">Clear Current</button>
+        </div>
+        <textarea id="csvPreview" rows="18" placeholder="Your CSV will appear here..."></textarea>
+        <div class="small">
+          Format: Artist, Song, Bpm, Key, Year, Genre
+        </div>
+      </div>
+    </div>
+
+    <div id="resultCard" class="card" style="margin-top:20px; display:none;">
+      <div class="album">
+        <h3 id="albumTitle">Album title</h3>
+        <div id="albumMeta" class="meta"></div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:90px;">Track #</th>
+              <th style="width:180px;">Artist</th>
+              <th>Song</th>
+              <th style="width:150px;">BPM</th>
+              <th style="width:160px;">Key</th>
+              <th style="width:120px;">Year</th>
+              <th style="width:180px;">Genre</th>
+            </tr>
+          </thead>
+          <tbody id="trackTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="session-box">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <div>
+            <div class="session-title">Batch Session</div>
+            <div id="sessionSummary" class="meta">No records in session yet.</div>
+          </div>
+          <div class="row" style="margin-bottom:0;">
+            <button id="clearSessionBtn" class="danger" disabled>Clear Session</button>
+          </div>
+        </div>
+        <div id="sessionList" class="small">Scan or look up a record, then click “Add to Session”.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const barcodeInput = document.getElementById('barcodeInput');
+    const discogsTokenInput = document.getElementById('discogsTokenInput');
+    const startCameraBtn = document.getElementById('startCameraBtn');
+    const stopCameraBtn = document.getElementById('stopCameraBtn');
+    const lookupBtn = document.getElementById('lookupBtn');
+    const addToSessionBtn = document.getElementById('addToSessionBtn');
+    const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+    const downloadSessionCsvBtn = document.getElementById('downloadSessionCsvBtn');
+    const copyCsvBtn = document.getElementById('copyCsvBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const clearSessionBtn = document.getElementById('clearSessionBtn');
+    const enterAddsToSessionToggle = document.getElementById('enterAddsToSessionToggle');
+    const csvPreview = document.getElementById('csvPreview');
+    const statusEl = document.getElementById('status');
+    const lookupNoticeEl = document.getElementById('lookupNotice');
+    const video = document.getElementById('video');
+    const resultCard = document.getElementById('resultCard');
+    const albumTitleEl = document.getElementById('albumTitle');
+    const albumMetaEl = document.getElementById('albumMeta');
+    const trackTableBody = document.getElementById('trackTableBody');
+    const sessionListEl = document.getElementById('sessionList');
+    const sessionSummaryEl = document.getElementById('sessionSummary');
+
+    const KEY_OPTIONS = ['', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A', '7B', '8A', '8B', '9A', '9B', '10A', '10B', '11A', '11B', '12A', '12B'];
+
+    let stream = null;
+    let scanTimer = null;
+    let lastCsv = '';
+    let lastFilename = 'record_tracks.csv';
+    let currentRelease = null;
+    let sessionReleases = [];
+
+    const DISCOGS_TOKEN_STORAGE_KEY = 'recordBarcodeCsv_discogsToken';
+    const ENTER_ADDS_STORAGE_KEY = 'recordBarcodeCsv_enterAddsToSession';
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function setLookupNotice(type, message) {
+      if (!message) {
+        lookupNoticeEl.style.display = 'none';
+        lookupNoticeEl.className = 'notice';
+        lookupNoticeEl.textContent = '';
+        return;
+      }
+      lookupNoticeEl.style.display = 'flex';
+      lookupNoticeEl.className = `notice ${type}`;
+      lookupNoticeEl.textContent = message;
+    }
+
+    function escapeCsv(value) {
+      const safe = String(value ?? '').replace(/"/g, '""');
+      return `"${safe}"`;
+    }
+
+    function buildCsvFromReleases(releases) {
+      const rows = [['Artist', 'Song', 'Bpm', 'Key', 'Year', 'Genre']];
+      releases.forEach((release) => {
+        (release.tracks || []).forEach((track) => {
+          rows.push([
+            track.artist || release.artist || '',
+            track.title || '',
+            track.bpm || '',
+            track.key || '',
+            track.year || release.year || '',
+            track.genre || release.genre || ''
+          ]);
+        });
+      });
+      return rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+    }
+
+    function buildCsv(release) {
+      return buildCsvFromReleases([release]);
+    }
+
+    function slugifyFilename(text) {
+      return String(text || 'record_tracks')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '') + '.csv';
+    }
+
+    function deepClone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function normalizeBarcode(value) {
+      return String(value || '').replace(/\D/g, '');
+    }
+
+    function releaseDuplicateReason(release) {
+      const barcode = normalizeBarcode(release.barcode);
+      const artistTitleKey = `${(release.artist || '').trim().toLowerCase()}|${(release.title || '').trim().toLowerCase()}`;
+      for (const existing of sessionReleases) {
+        const existingBarcode = normalizeBarcode(existing.barcode);
+        const existingArtistTitleKey = `${(existing.artist || '').trim().toLowerCase()}|${(existing.title || '').trim().toLowerCase()}`;
+        if (barcode && existingBarcode && barcode === existingBarcode) {
+          return 'This barcode is already in the session.';
+        }
+        if (artistTitleKey && existingArtistTitleKey && artistTitleKey === existingArtistTitleKey) {
+          return 'This release is already in the session.';
+        }
+      }
+      return '';
+    }
+
+    function updateCsvPreviewForCurrent() {
+      if (!currentRelease) {
+        csvPreview.value = '';
+        lastCsv = '';
+        downloadCsvBtn.disabled = true;
+        copyCsvBtn.disabled = true;
+        return;
+      }
+      lastCsv = buildCsv(currentRelease);
+      lastFilename = slugifyFilename(`${currentRelease.artist || 'unknown_artist'}_${currentRelease.title || 'release'}`);
+      csvPreview.value = lastCsv;
+      downloadCsvBtn.disabled = false;
+      copyCsvBtn.disabled = false;
+      refreshEmptyFieldHighlighting();
+    }
+
+    function isFieldEmpty(field, value) {
+      if (field === 'key') {
+        return !String(value || '').trim();
+      }
+      return !String(value || '').trim();
+    }
+
+    function refreshEmptyFieldHighlighting() {
+      const editors = trackTableBody.querySelectorAll('[data-track-index][data-field]');
+      editors.forEach((el) => {
+        const field = el.dataset.field;
+        if (isFieldEmpty(field, el.value)) {
+          el.classList.add('field-empty');
+        } else {
+          el.classList.remove('field-empty');
+        }
+      });
+    }
+
+    function createKeySelect(value, trackIndex) {
+      const select = document.createElement('select');
+      select.className = 'inline-input';
+      select.dataset.trackIndex = String(trackIndex);
+      select.dataset.field = 'key';
+      KEY_OPTIONS.forEach((optionValue) => {
+        const option = document.createElement('option');
+        option.value = optionValue;
+        option.textContent = optionValue || 'Blank';
+        if ((value || '') === optionValue) option.selected = true;
+        select.appendChild(option);
+      });
+      return select;
+    }
+
+    function createTextInput(value, trackIndex, field, placeholder = '') {
+      const input = document.createElement('input');
+      input.className = 'inline-input';
+      input.type = 'text';
+      input.value = value || '';
+      input.placeholder = placeholder;
+      input.dataset.trackIndex = String(trackIndex);
+      input.dataset.field = field;
+      return input;
+    }
+
+    function createBpmInput(value, trackIndex) {
+      const input = createTextInput(value, trackIndex, 'bpm', 'BPM');
+      input.inputMode = 'decimal';
+      return input;
+    }
+
+    function createArtistInput(value, trackIndex) {
+      return createTextInput(value, trackIndex, 'artist', 'Artist');
+    }
+
+    function createSongInput(value, trackIndex) {
+      return createTextInput(value, trackIndex, 'title', 'Song');
+    }
+
+    function createYearInput(value, trackIndex) {
+      const input = createTextInput(value, trackIndex, 'year', 'Year');
+      input.inputMode = 'numeric';
+      return input;
+    }
+
+    function createGenreInput(value, trackIndex) {
+      return createTextInput(value, trackIndex, 'genre', 'Genre');
+    }
+
+    function renderRelease(release) {
+      currentRelease = release;
+      albumTitleEl.textContent = release.title || 'Unknown Release';
+      const sourceText = release.lookupSource === 'discogs' ? 'Discogs backup' : 'MusicBrainz';
+      albumMetaEl.innerHTML = `${release.artist || 'Unknown Artist'}${release.date ? ' • ' + release.date : ''}${release.country ? ' • ' + release.country : ''}${release.barcode ? ' • UPC ' + release.barcode : ''}<span class="source-badge">${sourceText}</span>`;
+      trackTableBody.innerHTML = '';
+
+      release.tracks.forEach((track, index) => {
+        const tr = document.createElement('tr');
+
+        const tdNumber = document.createElement('td');
+        tdNumber.textContent = track.number || index + 1;
+
+        const tdArtist = document.createElement('td');
+        tdArtist.appendChild(createArtistInput(track.artist || release.artist || '', index));
+
+        const tdTitle = document.createElement('td');
+        tdTitle.appendChild(createSongInput(track.title || '', index));
+
+        const tdBpm = document.createElement('td');
+        tdBpm.appendChild(createBpmInput(track.bpm || '', index));
+
+        const tdKey = document.createElement('td');
+        tdKey.appendChild(createKeySelect(track.key || '', index));
+
+        const tdYear = document.createElement('td');
+        tdYear.appendChild(createYearInput(track.year || release.year || '', index));
+
+        const tdGenre = document.createElement('td');
+        tdGenre.appendChild(createGenreInput(track.genre || release.genre || '', index));
+
+        tr.appendChild(tdNumber);
+        tr.appendChild(tdArtist);
+        tr.appendChild(tdTitle);
+        tr.appendChild(tdBpm);
+        tr.appendChild(tdKey);
+        tr.appendChild(tdYear);
+        tr.appendChild(tdGenre);
+        trackTableBody.appendChild(tr);
+      });
+
+      updateCsvPreviewForCurrent();
+      addToSessionBtn.disabled = false;
+      resultCard.style.display = 'block';
+    }
+
+    function renderSession() {
+      if (!sessionReleases.length) {
+        sessionSummaryEl.textContent = 'No records in session yet.';
+        sessionListEl.innerHTML = 'Scan or look up a record, then click “Add to Session”.';
+        clearSessionBtn.disabled = true;
+        downloadSessionCsvBtn.disabled = true;
+        return;
+      }
+
+      const totalTracks = sessionReleases.reduce((sum, release) => sum + (release.tracks || []).length, 0);
+      sessionSummaryEl.textContent = `${sessionReleases.length} record(s) • ${totalTracks} total track row(s)`;
+      clearSessionBtn.disabled = false;
+      downloadSessionCsvBtn.disabled = false;
+
+      sessionListEl.innerHTML = '';
+      sessionReleases.forEach((release, index) => {
+        const item = document.createElement('div');
+        item.className = 'session-item';
+
+        const left = document.createElement('div');
+        const source = release.lookupSource === 'discogs' ? 'Discogs backup' : 'MusicBrainz';
+        left.innerHTML = `<strong>${release.artist || 'Unknown Artist'} - ${release.title || 'Unknown Release'}</strong><span class="source-badge">${source}</span><div class="small">${release.barcode ? 'UPC ' + release.barcode + ' • ' : ''}${release.tracks.length} track(s)</div>`;
+
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'ghost';
+        loadBtn.textContent = 'Load';
+        loadBtn.addEventListener('click', () => {
+          currentRelease = deepClone(release);
+          renderRelease(currentRelease);
+          setStatus(`Loaded session record ${index + 1}.`);
+        });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'danger';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          sessionReleases.splice(index, 1);
+          renderSession();
+          setStatus('Removed record from session.');
+        });
+
+        item.appendChild(left);
+        item.appendChild(loadBtn);
+        item.appendChild(removeBtn);
+        sessionListEl.appendChild(item);
+      });
+    }
+
+    function syncCurrentReleaseEdits() {
+      if (!currentRelease) return;
+      const editors = trackTableBody.querySelectorAll('[data-track-index][data-field]');
+      editors.forEach((el) => {
+        const trackIndex = Number(el.dataset.trackIndex);
+        const field = el.dataset.field;
+        if (!currentRelease.tracks[trackIndex]) return;
+        currentRelease.tracks[trackIndex][field] = String(el.value || '').trim();
+      });
+      updateCsvPreviewForCurrent();
+    }
+
+    function applyCurrentReleaseBackToSessionIfDuplicateFound() {
+      if (!currentRelease) return;
+      const barcode = normalizeBarcode(currentRelease.barcode);
+      const artistTitleKey = `${(currentRelease.artist || '').trim().toLowerCase()}|${(currentRelease.title || '').trim().toLowerCase()}`;
+      const sessionIndex = sessionReleases.findIndex((release) => {
+        const existingBarcode = normalizeBarcode(release.barcode);
+        const existingArtistTitleKey = `${(release.artist || '').trim().toLowerCase()}|${(release.title || '').trim().toLowerCase()}`;
+        return (barcode && existingBarcode && barcode === existingBarcode) || (artistTitleKey && existingArtistTitleKey && artistTitleKey === existingArtistTitleKey);
+      });
+      if (sessionIndex >= 0) {
+        sessionReleases[sessionIndex] = deepClone(currentRelease);
+        renderSession();
+      }
+    }
+
+    async function lookupMusicBrainzByBarcode(barcode) {
+      const searchUrl = `https://musicbrainz.org/ws/2/release/?query=barcode:${encodeURIComponent(barcode)}&fmt=json&limit=10`;
+      const searchRes = await fetch(searchUrl, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!searchRes.ok) {
+        throw new Error(`MusicBrainz search failed (${searchRes.status})`);
+      }
+
+      const searchData = await searchRes.json();
+      const releases = searchData.releases || [];
+      if (!releases.length) {
+        throw new Error('No release found for that barcode.');
+      }
+
+      const best = releases.find((r) => (r.media || []).some((m) => (m['track-count'] || 0) > 0)) || releases[0];
+      const detailUrl = `https://musicbrainz.org/ws/2/release/${best.id}?inc=recordings+artists+labels&fmt=json`;
+      const detailRes = await fetch(detailUrl, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!detailRes.ok) {
+        throw new Error(`MusicBrainz release lookup failed (${detailRes.status})`);
+      }
+
+      const detail = await detailRes.json();
+      const artist = (detail['artist-credit'] || []).map((a) => a.name).join(', ');
+      const tracks = [];
+      for (const medium of (detail.media || [])) {
+        for (const track of (medium.tracks || [])) {
+          tracks.push({
+            number: track.number || '',
+            title: track.title || '',
+            artist: artist || '',
+            bpm: '',
+            key: '',
+            year: '',
+            genre: ''
+          });
+        }
+      }
+      if (!tracks.length) {
+        throw new Error('Release found, but no track list was returned.');
+      }
+
+      return {
+        title: detail.title || '',
+        artist: artist || '',
+        date: detail.date || '',
+        year: (detail.date || '').slice(0, 4),
+        genre: '',
+        country: detail.country || '',
+        barcode,
+        tracks,
+        lookupSource: 'musicbrainz'
+      };
+    }
+
+    async function lookupDiscogsByBarcode(barcode, token) {
+      if (!token) {
+        throw new Error('Discogs token missing.');
+      }
+
+      const searchUrl = `https://api.discogs.com/database/search?barcode=${encodeURIComponent(barcode)}&type=release&per_page=10`;
+      const searchRes = await fetch(searchUrl, {
+        headers: {
+          Authorization: `Discogs token=${token}`,
+          Accept: 'application/json'
+        }
+      });
+
+      if (!searchRes.ok) {
+        throw new Error(`Discogs search failed (${searchRes.status})`);
+      }
+
+      const searchData = await searchRes.json();
+      const results = searchData.results || [];
+      const best = results.find((item) => item.type === 'release') || results[0];
+      if (!best || !best.id) {
+        throw new Error('Discogs did not find a release for that barcode.');
+      }
+
+      const detailRes = await fetch(`https://api.discogs.com/releases/${best.id}`, {
+        headers: {
+          Authorization: `Discogs token=${token}`,
+          Accept: 'application/json'
+        }
+      });
+
+      if (!detailRes.ok) {
+        throw new Error(`Discogs release lookup failed (${detailRes.status})`);
+      }
+
+      const detail = await detailRes.json();
+      const artist = (detail.artists || []).map((a) => a.name).join(', ').replace(/\s*\(\d+\)\s*/g, '').trim();
+      const tracklist = (detail.tracklist || []).filter((t) => t.type_ !== 'heading' && t.title);
+      if (!tracklist.length) {
+        throw new Error('Discogs found the release, but there was no usable tracklist.');
+      }
+
+      const primaryGenre = Array.isArray(detail.genres) && detail.genres.length ? detail.genres.join(' / ') : '';
+      const year = detail.year ? String(detail.year) : '';
+
+      return {
+        title: detail.title || '',
+        artist: artist || '',
+        date: year,
+        year,
+        genre: primaryGenre,
+        country: detail.country || '',
+        barcode,
+        lookupSource: 'discogs',
+        tracks: tracklist.map((track) => ({
+          number: track.position || '',
+          title: track.title || '',
+          artist: artist || '',
+          bpm: '',
+          key: '',
+          year,
+          genre: primaryGenre
+        }))
+      };
+    }
+
+    async function lookupReleaseWithFallback(barcode) {
+      const discogsToken = discogsTokenInput.value.trim();
+      const notices = [];
+
+      try {
+        const release = await lookupMusicBrainzByBarcode(barcode);
+        notices.push('Primary lookup: MusicBrainz succeeded.');
+        return { release, notices, usedFallback: false };
+      } catch (musicbrainzError) {
+        notices.push(`MusicBrainz failed: ${musicbrainzError.message}`);
+        if (!discogsToken) {
+          throw new Error(`MusicBrainz failed and no Discogs token was provided.\n${musicbrainzError.message}`);
+        }
+      }
+
+      try {
+        const release = await lookupDiscogsByBarcode(barcode, discogsToken);
+        notices.push('Backup lookup: Discogs succeeded.');
+        return { release, notices, usedFallback: true };
+      } catch (discogsError) {
+        notices.push(`Discogs failed: ${discogsError.message}`);
+        throw new Error(notices.join('\n'));
+      }
+    }
+
+    async function doLookup() {
+      const barcode = normalizeBarcode(barcodeInput.value);
+      if (!barcode) {
+        setStatus('Enter or scan a barcode first.');
+        return;
+      }
+
+      try {
+        setLookupNotice('', '');
+        setStatus(`Looking up ${barcode}...`);
+        lookupBtn.disabled = true;
+        const outcome = await lookupReleaseWithFallback(barcode);
+        renderRelease(outcome.release);
+
+        const duplicateMessage = releaseDuplicateReason(outcome.release);
+        if (duplicateMessage) {
+          setLookupNotice('warning', `${outcome.notices.join('\n')}\n${duplicateMessage}`);
+        } else if (outcome.usedFallback) {
+          setLookupNotice('warning', outcome.notices.join('\n'));
+        } else {
+          setLookupNotice('success', outcome.notices.join('\n'));
+        }
+
+        setStatus(`Found: ${outcome.release.artist} - ${outcome.release.title}`);
+      } catch (err) {
+        console.error(err);
+        setStatus('Lookup failed.');
+        setLookupNotice('error', err.message || 'Lookup failed.');
+      } finally {
+        lookupBtn.disabled = false;
+      }
+    }
+
+    async function startCameraScan() {
+      if (!('BarcodeDetector' in window)) {
+        setStatus('Barcode scanning is not supported in this browser. Type or paste the barcode instead.');
+        return;
+      }
+
+      try {
+        const formats = await BarcodeDetector.getSupportedFormats();
+        const wanted = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+        const supported = wanted.filter((f) => formats.includes(f));
+        if (!supported.length) {
+          setStatus('This browser does not support UPC/EAN scanning formats.');
+          return;
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        const detector = new BarcodeDetector({ formats: supported });
+        startCameraBtn.disabled = true;
+        stopCameraBtn.disabled = false;
+        setStatus('Scanning... hold the barcode steady in frame.');
+
+        scanTimer = setInterval(async () => {
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length) {
+              const rawValue = normalizeBarcode(barcodes[0].rawValue || '');
+              if (rawValue) {
+                barcodeInput.value = rawValue;
+                stopCameraScan();
+                setStatus(`Scanned barcode: ${rawValue}`);
+                doLookup();
+              }
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }, 500);
+      } catch (err) {
+        console.error(err);
+        setStatus('Unable to access the camera. Check browser permissions.');
+      }
+    }
+
+    function stopCameraScan() {
+      if (scanTimer) {
+        clearInterval(scanTimer);
+        scanTimer = null;
+      }
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      startCameraBtn.disabled = false;
+      stopCameraBtn.disabled = true;
+    }
+
+    function downloadBlobCsv(csv, filename) {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadCsv() {
+      if (!currentRelease) return;
+      syncCurrentReleaseEdits();
+      downloadBlobCsv(lastCsv, lastFilename);
+    }
+
+    function downloadSessionCsv() {
+      if (!sessionReleases.length) return;
+      const csv = buildCsvFromReleases(sessionReleases);
+      downloadBlobCsv(csv, 'record_session_export.csv');
+    }
+
+    async function copyCsv() {
+      if (!currentRelease) return;
+      syncCurrentReleaseEdits();
+      try {
+        await navigator.clipboard.writeText(lastCsv);
+        setStatus('CSV copied to clipboard.');
+      } catch (err) {
+        setStatus('Could not copy CSV.');
+      }
+    }
+
+    function addCurrentToSession() {
+      if (!currentRelease) return;
+      syncCurrentReleaseEdits();
+      const duplicateMessage = releaseDuplicateReason(currentRelease);
+      if (duplicateMessage) {
+        setLookupNotice('warning', duplicateMessage);
+        setStatus('Duplicate prevented.');
+        return;
+      }
+      sessionReleases.push(deepClone(currentRelease));
+      renderSession();
+      setStatus('Added current release to session.');
+      setLookupNotice('success', 'Current release added to batch session.');
+      barcodeInput.focus();
+      barcodeInput.select();
+    }
+
+    function handlePrimaryEnterShortcut(event) {
+      if (event.key !== 'Enter') return;
+      if (event.target && (event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT')) return;
+      if (enterAddsToSessionToggle.checked && currentRelease && !addToSessionBtn.disabled) {
+        event.preventDefault();
+        addCurrentToSession();
+      }
+    }
+
+    function savePreferences() {
+      try {
+        localStorage.setItem(DISCOGS_TOKEN_STORAGE_KEY, discogsTokenInput.value.trim());
+        localStorage.setItem(ENTER_ADDS_STORAGE_KEY, enterAddsToSessionToggle.checked ? '1' : '0');
+      } catch (error) {
+        console.error('Could not save preferences.', error);
+      }
+    }
+
+    function loadPreferences() {
+      try {
+        const savedToken = localStorage.getItem(DISCOGS_TOKEN_STORAGE_KEY);
+        const savedEnterAdds = localStorage.getItem(ENTER_ADDS_STORAGE_KEY);
+        if (savedToken) {
+          discogsTokenInput.value = savedToken;
+        }
+        enterAddsToSessionToggle.checked = savedEnterAdds === '1';
+      } catch (error) {
+        console.error('Could not load preferences.', error);
+      }
+    }
+
+    function clearCurrent() {
+      stopCameraScan();
+      barcodeInput.value = '';
+      csvPreview.value = '';
+      lastCsv = '';
+      currentRelease = null;
+      resultCard.style.display = 'none';
+      addToSessionBtn.disabled = true;
+      downloadCsvBtn.disabled = true;
+      copyCsvBtn.disabled = true;
+      setLookupNotice('', '');
+      setStatus('Cleared current release.');
+      barcodeInput.focus();
+    }
+
+    function clearSession() {
+      sessionReleases = [];
+      renderSession();
+      setStatus('Cleared session.');
+    }
+
+    trackTableBody.addEventListener('input', () => {
+      syncCurrentReleaseEdits();
+      applyCurrentReleaseBackToSessionIfDuplicateFound();
+      refreshEmptyFieldHighlighting();
+    });
+
+    trackTableBody.addEventListener('change', () => {
+      syncCurrentReleaseEdits();
+      applyCurrentReleaseBackToSessionIfDuplicateFound();
+      refreshEmptyFieldHighlighting();
+    });
+
+    startCameraBtn.addEventListener('click', startCameraScan);
+    stopCameraBtn.addEventListener('click', stopCameraScan);
+    lookupBtn.addEventListener('click', doLookup);
+    addToSessionBtn.addEventListener('click', addCurrentToSession);
+    downloadCsvBtn.addEventListener('click', downloadCsv);
+    downloadSessionCsvBtn.addEventListener('click', downloadSessionCsv);
+    copyCsvBtn.addEventListener('click', copyCsv);
+    clearBtn.addEventListener('click', clearCurrent);
+    clearSessionBtn.addEventListener('click', clearSession);
+    barcodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLookup();
+    });
+    discogsTokenInput.addEventListener('input', savePreferences);
+    enterAddsToSessionToggle.addEventListener('change', savePreferences);
+    document.addEventListener('keydown', handlePrimaryEnterShortcut);
+
+    loadPreferences();
+    renderSession();
+  </script>
+  <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
+  <script>
+    // Fallback scanner for Safari / Mac
+    let quaggaActive = false;
+
+    function startQuaggaScan() {
+      if (quaggaActive) return;
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(() => {
+          Quagga.init({
+            inputStream: {
+              type: "LiveStream",
+              target: video,
+              constraints: { facingMode: "environment" }
+            },
+            decoder: {
+              readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader"]
+            }
+          }, function (err) {
+            if (err) {
+              console.error(err);
+              setStatus("Camera init failed.");
+              return;
+            }
+
+            Quagga.start();
+            quaggaActive = true;
+            startCameraBtn.disabled = true;
+            stopCameraBtn.disabled = false;
+            setStatus("Scanning (fallback mode)...");
+          });
+
+          Quagga.onDetected((result) => {
+            const code = normalizeBarcode(result.codeResult.code);
+            if (code) {
+              barcodeInput.value = code;
+              stopCameraScan();
+              setStatus(`Scanned barcode: ${code}`);
+              doLookup();
+            }
+          });
+        })
+        .catch(() => {
+          setStatus("Camera permission denied.");
+        });
+    }
+
+    const originalStartCameraScan = startCameraScan;
+    startCameraScan = async function () {
+      if (!('BarcodeDetector' in window)) {
+        startQuaggaScan();
+        return;
+      }
+      return originalStartCameraScan();
+    };
+
+    const originalStopCameraScan = stopCameraScan;
+    stopCameraScan = function () {
+      if (quaggaActive) {
+        Quagga.stop();
+        quaggaActive = false;
+      }
+      originalStopCameraScan();
+    };
+  </script>
+</body>
+</html>
