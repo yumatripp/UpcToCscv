@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Record Barcode to CSV</title>
+  <title>Record Barcode to CSV v1.0.1</title>
   <style>
     :root {
       --bg: #111827;
@@ -35,11 +35,6 @@
     h1 {
       margin: 0 0 8px;
       font-size: 32px;
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-size: 20px;
     }
 
     .sub {
@@ -223,6 +218,20 @@
     }
 
     .source-badge, .duplicate-badge {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 11px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      vertical-align: middle;
+    }
+
+    .source-badge {
+      background: #1d4ed8;
+      color: #dbeafe;
+    }
+
+    .duplicate-badge {
       background: #7c2d12;
       color: #fed7aa;
     }
@@ -248,17 +257,43 @@
       accent-color: var(--accent);
     }
 
-    .track-editor {
+    .bulk-tools {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
-      align-items: center;
+      align-items: end;
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.55);
     }
 
-    .muted-linkish {
-      color: #93c5fd;
-      cursor: pointer;
-      text-decoration: underline;
+    .bulk-tools .field {
+      min-width: 120px;
+      flex: 1 1 120px;
+    }
+
+    .bulk-tools .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+
+    .track-select-cell {
+      width: 44px;
+      text-align: center;
+    }
+
+    .track-row-selected {
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .delete-track-btn {
+      padding: 8px 10px;
+      font-size: 12px;
+      border-radius: 8px;
     }
 
     @media (max-width: 980px) {
@@ -269,9 +304,9 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Record Barcode to CSV</h1>
+    <h1>Record Barcode to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.1</span></h1>
     <div class="sub">
-      Scan a UPC/EAN barcode on a record sleeve, look up the release, preview the tracks, edit BPM and key inline, batch records into one session, and export a clean CSV. MusicBrainz is used first, with Discogs as a backup when you provide a Discogs token.
+      Scan a UPC/EAN barcode on a record sleeve, look up the release, preview the tracks, edit fields inline, bulk-edit selected rows, delete tracks before export, batch records into one session, and export a clean CSV. MusicBrainz is used first, with Discogs as a backup when you provide a Discogs token.
     </div>
 
     <div class="grid">
@@ -327,9 +362,38 @@
       <div class="album">
         <h3 id="albumTitle">Album title</h3>
         <div id="albumMeta" class="meta"></div>
+
+        <div class="bulk-tools">
+          <div class="field">
+            <label for="bulkArtistInput">Artist</label>
+            <input id="bulkArtistInput" placeholder="Set artist" />
+          </div>
+          <div class="field">
+            <label for="bulkYearInput">Year</label>
+            <input id="bulkYearInput" placeholder="Set year" inputmode="numeric" />
+          </div>
+          <div class="field">
+            <label for="bulkGenreInput">Genre</label>
+            <input id="bulkGenreInput" placeholder="Set genre" />
+          </div>
+          <div class="field">
+            <label for="bulkKeySelect">Key</label>
+            <select id="bulkKeySelect"></select>
+          </div>
+          <div class="field">
+            <label for="bulkBpmInput">BPM</label>
+            <input id="bulkBpmInput" placeholder="Set BPM" inputmode="decimal" />
+          </div>
+          <div class="actions">
+            <button id="applyBulkBtn" class="secondary" type="button">Apply to Selected</button>
+            <button id="deleteSelectedTracksBtn" class="danger" type="button">Delete Selected</button>
+          </div>
+        </div>
+
         <table>
           <thead>
             <tr>
+              <th class="track-select-cell"><input id="selectAllTracks" type="checkbox" /></th>
               <th style="width:90px;">Track #</th>
               <th style="width:180px;">Artist</th>
               <th>Song</th>
@@ -337,6 +401,7 @@
               <th style="width:160px;">Key</th>
               <th style="width:120px;">Year</th>
               <th style="width:180px;">Genre</th>
+              <th style="width:90px;">Delete</th>
             </tr>
           </thead>
           <tbody id="trackTableBody"></tbody>
@@ -383,6 +448,14 @@
     const trackTableBody = document.getElementById('trackTableBody');
     const sessionListEl = document.getElementById('sessionList');
     const sessionSummaryEl = document.getElementById('sessionSummary');
+    const bulkArtistInput = document.getElementById('bulkArtistInput');
+    const bulkYearInput = document.getElementById('bulkYearInput');
+    const bulkGenreInput = document.getElementById('bulkGenreInput');
+    const bulkKeySelect = document.getElementById('bulkKeySelect');
+    const bulkBpmInput = document.getElementById('bulkBpmInput');
+    const applyBulkBtn = document.getElementById('applyBulkBtn');
+    const deleteSelectedTracksBtn = document.getElementById('deleteSelectedTracksBtn');
+    const selectAllTracks = document.getElementById('selectAllTracks');
 
     const KEY_OPTIONS = ['', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A', '7B', '8A', '8B', '9A', '9B', '10A', '10B', '11A', '11B', '12A', '12B'];
 
@@ -395,6 +468,16 @@
 
     const DISCOGS_TOKEN_STORAGE_KEY = 'recordBarcodeCsv_discogsToken';
     const ENTER_ADDS_STORAGE_KEY = 'recordBarcodeCsv_enterAddsToSession';
+
+    function populateBulkKeySelect() {
+      bulkKeySelect.innerHTML = '';
+      KEY_OPTIONS.forEach((optionValue) => {
+        const option = document.createElement('option');
+        option.value = optionValue;
+        option.textContent = optionValue || 'Blank';
+        bulkKeySelect.appendChild(option);
+      });
+    }
 
     function setStatus(message) {
       statusEl.textContent = message;
@@ -486,10 +569,25 @@
     }
 
     function isFieldEmpty(field, value) {
-      if (field === 'key') {
-        return !String(value || '').trim();
-      }
       return !String(value || '').trim();
+    }
+
+    function getSelectedTrackIndexes() {
+      return Array.from(trackTableBody.querySelectorAll('input[data-role="track-select"]:checked'))
+        .map((checkbox) => Number(checkbox.dataset.trackIndex))
+        .filter((value) => Number.isInteger(value));
+    }
+
+    function refreshSelectAllState() {
+      const checkboxes = Array.from(trackTableBody.querySelectorAll('input[data-role="track-select"]'));
+      if (!checkboxes.length) {
+        selectAllTracks.checked = false;
+        selectAllTracks.indeterminate = false;
+        return;
+      }
+      const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+      selectAllTracks.checked = checkedCount === checkboxes.length;
+      selectAllTracks.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
     }
 
     function refreshEmptyFieldHighlighting() {
@@ -502,6 +600,24 @@
           el.classList.remove('field-empty');
         }
       });
+
+      const rows = trackTableBody.querySelectorAll('tr[data-track-index]');
+      rows.forEach((row) => {
+        const checkbox = row.querySelector('input[data-role="track-select"]');
+        if (checkbox && checkbox.checked) {
+          row.classList.add('track-row-selected');
+        } else {
+          row.classList.remove('track-row-selected');
+        }
+      });
+    }
+
+    function clearBulkInputs() {
+      bulkArtistInput.value = '';
+      bulkYearInput.value = '';
+      bulkGenreInput.value = '';
+      bulkKeySelect.value = '';
+      bulkBpmInput.value = '';
     }
 
     function createKeySelect(value, trackIndex) {
@@ -560,9 +676,20 @@
       const sourceText = release.lookupSource === 'discogs' ? 'Discogs backup' : 'MusicBrainz';
       albumMetaEl.innerHTML = `${release.artist || 'Unknown Artist'}${release.date ? ' • ' + release.date : ''}${release.country ? ' • ' + release.country : ''}${release.barcode ? ' • UPC ' + release.barcode : ''}<span class="source-badge">${sourceText}</span>`;
       trackTableBody.innerHTML = '';
+      selectAllTracks.checked = false;
+      selectAllTracks.indeterminate = false;
 
       release.tracks.forEach((track, index) => {
         const tr = document.createElement('tr');
+        tr.dataset.trackIndex = String(index);
+
+        const tdSelect = document.createElement('td');
+        tdSelect.className = 'track-select-cell';
+        const selectCheckbox = document.createElement('input');
+        selectCheckbox.type = 'checkbox';
+        selectCheckbox.dataset.role = 'track-select';
+        selectCheckbox.dataset.trackIndex = String(index);
+        tdSelect.appendChild(selectCheckbox);
 
         const tdNumber = document.createElement('td');
         tdNumber.textContent = track.number || index + 1;
@@ -585,6 +712,16 @@
         const tdGenre = document.createElement('td');
         tdGenre.appendChild(createGenreInput(track.genre || release.genre || '', index));
 
+        const tdDelete = document.createElement('td');
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'danger delete-track-btn';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.dataset.action = 'delete-track';
+        deleteBtn.dataset.trackIndex = String(index);
+        tdDelete.appendChild(deleteBtn);
+
+        tr.appendChild(tdSelect);
         tr.appendChild(tdNumber);
         tr.appendChild(tdArtist);
         tr.appendChild(tdTitle);
@@ -592,6 +729,7 @@
         tr.appendChild(tdKey);
         tr.appendChild(tdYear);
         tr.appendChild(tdGenre);
+        tr.appendChild(tdDelete);
         trackTableBody.appendChild(tr);
       });
 
@@ -675,29 +813,97 @@
       }
     }
 
+    function renumberTracks(tracks) {
+      tracks.forEach((track, index) => {
+        if (!track.number || /^\d+$/.test(String(track.number).trim())) {
+          track.number = String(index + 1);
+        }
+      });
+    }
+
+    function deleteTracksByIndexes(indexes) {
+      if (!currentRelease || !indexes.length) return;
+      currentRelease.tracks = currentRelease.tracks.filter((_, index) => !indexes.includes(index));
+      renumberTracks(currentRelease.tracks);
+      renderRelease(currentRelease);
+      if (!currentRelease.tracks.length) {
+        setLookupNotice('warning', 'All tracks were deleted from the current release.');
+        setStatus('All tracks removed.');
+      } else {
+        setLookupNotice('success', `${indexes.length} track(s) removed from the current release.`);
+        setStatus(`${indexes.length} track(s) deleted.`);
+      }
+      applyCurrentReleaseBackToSessionIfDuplicateFound();
+    }
+
+    function applyBulkEditToSelected() {
+      if (!currentRelease) return;
+      syncCurrentReleaseEdits();
+      const selectedIndexes = getSelectedTrackIndexes();
+      if (!selectedIndexes.length) {
+        setLookupNotice('warning', 'Select one or more tracks before applying bulk edits.');
+        setStatus('No tracks selected.');
+        return;
+      }
+
+      const updates = {
+        artist: bulkArtistInput.value.trim(),
+        year: bulkYearInput.value.trim(),
+        genre: bulkGenreInput.value.trim(),
+        key: bulkKeySelect.value.trim(),
+        bpm: bulkBpmInput.value.trim()
+      };
+
+      const activeFields = Object.entries(updates).filter(([, value]) => value !== '');
+      if (!activeFields.length) {
+        setLookupNotice('warning', 'Enter at least one bulk value to apply.');
+        setStatus('No bulk values entered.');
+        return;
+      }
+
+      selectedIndexes.forEach((index) => {
+        const track = currentRelease.tracks[index];
+        if (!track) return;
+        activeFields.forEach(([field, value]) => {
+          track[field] = value;
+        });
+      });
+
+      renderRelease(currentRelease);
+      selectedIndexes.forEach((index) => {
+        const checkbox = trackTableBody.querySelector(`input[data-role="track-select"][data-track-index="${index}"]`);
+        if (checkbox) checkbox.checked = true;
+      });
+      refreshSelectAllState();
+      refreshEmptyFieldHighlighting();
+      applyCurrentReleaseBackToSessionIfDuplicateFound();
+      setLookupNotice('success', `Applied bulk edits to ${selectedIndexes.length} selected track(s).`);
+      setStatus('Bulk edit applied.');
+    }
+
+    function deleteSelectedTracks() {
+      const selectedIndexes = getSelectedTrackIndexes();
+      if (!selectedIndexes.length) {
+        setLookupNotice('warning', 'Select one or more tracks before deleting.');
+        setStatus('No tracks selected.');
+        return;
+      }
+      deleteTracksByIndexes(selectedIndexes);
+    }
+
     async function lookupMusicBrainzByBarcode(barcode) {
       const searchUrl = `https://musicbrainz.org/ws/2/release/?query=barcode:${encodeURIComponent(barcode)}&fmt=json&limit=10`;
-      const searchRes = await fetch(searchUrl, {
-        headers: { Accept: 'application/json' }
-      });
-      if (!searchRes.ok) {
-        throw new Error(`MusicBrainz search failed (${searchRes.status})`);
-      }
+      const searchRes = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
+      if (!searchRes.ok) throw new Error(`MusicBrainz search failed (${searchRes.status})`);
 
       const searchData = await searchRes.json();
       const releases = searchData.releases || [];
-      if (!releases.length) {
-        throw new Error('No release found for that barcode.');
-      }
+      if (!releases.length) throw new Error('No release found for that barcode.');
 
       const best = releases.find((r) => (r.media || []).some((m) => (m['track-count'] || 0) > 0)) || releases[0];
       const detailUrl = `https://musicbrainz.org/ws/2/release/${best.id}?inc=recordings+artists+labels&fmt=json`;
-      const detailRes = await fetch(detailUrl, {
-        headers: { Accept: 'application/json' }
-      });
-      if (!detailRes.ok) {
-        throw new Error(`MusicBrainz release lookup failed (${detailRes.status})`);
-      }
+      const detailRes = await fetch(detailUrl, { headers: { Accept: 'application/json' } });
+      if (!detailRes.ok) throw new Error(`MusicBrainz release lookup failed (${detailRes.status})`);
 
       const detail = await detailRes.json();
       const artist = (detail['artist-credit'] || []).map((a) => a.name).join(', ');
@@ -715,9 +921,7 @@
           });
         }
       }
-      if (!tracks.length) {
-        throw new Error('Release found, but no track list was returned.');
-      }
+      if (!tracks.length) throw new Error('Release found, but no track list was returned.');
 
       return {
         title: detail.title || '',
@@ -733,46 +937,28 @@
     }
 
     async function lookupDiscogsByBarcode(barcode, token) {
-      if (!token) {
-        throw new Error('Discogs token missing.');
-      }
+      if (!token) throw new Error('Discogs token missing.');
 
       const searchUrl = `https://api.discogs.com/database/search?barcode=${encodeURIComponent(barcode)}&type=release&per_page=10`;
       const searchRes = await fetch(searchUrl, {
-        headers: {
-          Authorization: `Discogs token=${token}`,
-          Accept: 'application/json'
-        }
+        headers: { Authorization: `Discogs token=${token}`, Accept: 'application/json' }
       });
-
-      if (!searchRes.ok) {
-        throw new Error(`Discogs search failed (${searchRes.status})`);
-      }
+      if (!searchRes.ok) throw new Error(`Discogs search failed (${searchRes.status})`);
 
       const searchData = await searchRes.json();
       const results = searchData.results || [];
       const best = results.find((item) => item.type === 'release') || results[0];
-      if (!best || !best.id) {
-        throw new Error('Discogs did not find a release for that barcode.');
-      }
+      if (!best || !best.id) throw new Error('Discogs did not find a release for that barcode.');
 
       const detailRes = await fetch(`https://api.discogs.com/releases/${best.id}`, {
-        headers: {
-          Authorization: `Discogs token=${token}`,
-          Accept: 'application/json'
-        }
+        headers: { Authorization: `Discogs token=${token}`, Accept: 'application/json' }
       });
-
-      if (!detailRes.ok) {
-        throw new Error(`Discogs release lookup failed (${detailRes.status})`);
-      }
+      if (!detailRes.ok) throw new Error(`Discogs release lookup failed (${detailRes.status})`);
 
       const detail = await detailRes.json();
       const artist = (detail.artists || []).map((a) => a.name).join(', ').replace(/\s*\(\d+\)\s*/g, '').trim();
       const tracklist = (detail.tracklist || []).filter((t) => t.type_ !== 'heading' && t.title);
-      if (!tracklist.length) {
-        throw new Error('Discogs found the release, but there was no usable tracklist.');
-      }
+      if (!tracklist.length) throw new Error('Discogs found the release, but there was no usable tracklist.');
 
       const primaryGenre = Array.isArray(detail.genres) && detail.genres.length ? detail.genres.join(' / ') : '';
       const year = detail.year ? String(detail.year) : '';
@@ -801,7 +987,6 @@
     async function lookupReleaseWithFallback(barcode) {
       const discogsToken = discogsTokenInput.value.trim();
       const notices = [];
-
       try {
         const release = await lookupMusicBrainzByBarcode(barcode);
         notices.push('Primary lookup: MusicBrainz succeeded.');
@@ -871,11 +1056,7 @@
           return;
         }
 
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false
-        });
-
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
         video.srcObject = stream;
         await video.play();
 
@@ -994,9 +1175,7 @@
       try {
         const savedToken = localStorage.getItem(DISCOGS_TOKEN_STORAGE_KEY);
         const savedEnterAdds = localStorage.getItem(ENTER_ADDS_STORAGE_KEY);
-        if (savedToken) {
-          discogsTokenInput.value = savedToken;
-        }
+        if (savedToken) discogsTokenInput.value = savedToken;
         enterAddsToSessionToggle.checked = savedEnterAdds === '1';
       } catch (error) {
         console.error('Could not load preferences.', error);
@@ -1013,6 +1192,9 @@
       addToSessionBtn.disabled = true;
       downloadCsvBtn.disabled = true;
       copyCsvBtn.disabled = true;
+      selectAllTracks.checked = false;
+      selectAllTracks.indeterminate = false;
+      clearBulkInputs();
       setLookupNotice('', '');
       setStatus('Cleared current release.');
       barcodeInput.focus();
@@ -1034,8 +1216,34 @@
       syncCurrentReleaseEdits();
       applyCurrentReleaseBackToSessionIfDuplicateFound();
       refreshEmptyFieldHighlighting();
+      refreshSelectAllState();
     });
 
+    trackTableBody.addEventListener('click', (event) => {
+      const deleteButton = event.target.closest('button[data-action="delete-track"]');
+      if (deleteButton) {
+        const trackIndex = Number(deleteButton.dataset.trackIndex);
+        if (Number.isInteger(trackIndex)) deleteTracksByIndexes([trackIndex]);
+        return;
+      }
+      const checkbox = event.target.closest('input[data-role="track-select"]');
+      if (checkbox) {
+        refreshSelectAllState();
+        refreshEmptyFieldHighlighting();
+      }
+    });
+
+    selectAllTracks.addEventListener('change', () => {
+      const checked = selectAllTracks.checked;
+      trackTableBody.querySelectorAll('input[data-role="track-select"]').forEach((checkbox) => {
+        checkbox.checked = checked;
+      });
+      refreshSelectAllState();
+      refreshEmptyFieldHighlighting();
+    });
+
+    applyBulkBtn.addEventListener('click', applyBulkEditToSelected);
+    deleteSelectedTracksBtn.addEventListener('click', deleteSelectedTracks);
     startCameraBtn.addEventListener('click', startCameraScan);
     stopCameraBtn.addEventListener('click', stopCameraScan);
     lookupBtn.addEventListener('click', doLookup);
@@ -1052,12 +1260,12 @@
     enterAddsToSessionToggle.addEventListener('change', savePreferences);
     document.addEventListener('keydown', handlePrimaryEnterShortcut);
 
+    populateBulkKeySelect();
     loadPreferences();
     renderSession();
   </script>
   <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
   <script>
-    // Fallback scanner for Safari / Mac
     let quaggaActive = false;
 
     function startQuaggaScan() {
@@ -1067,17 +1275,17 @@
         .then(() => {
           Quagga.init({
             inputStream: {
-              type: "LiveStream",
+              type: 'LiveStream',
               target: video,
-              constraints: { facingMode: "environment" }
+              constraints: { facingMode: 'environment' }
             },
             decoder: {
-              readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader"]
+              readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader']
             }
           }, function (err) {
             if (err) {
               console.error(err);
-              setStatus("Camera init failed.");
+              setStatus('Camera init failed.');
               return;
             }
 
@@ -1085,7 +1293,7 @@
             quaggaActive = true;
             startCameraBtn.disabled = true;
             stopCameraBtn.disabled = false;
-            setStatus("Scanning (fallback mode)...");
+            setStatus('Scanning (fallback mode)...');
           });
 
           Quagga.onDetected((result) => {
@@ -1099,7 +1307,7 @@
           });
         })
         .catch(() => {
-          setStatus("Camera permission denied.");
+          setStatus('Camera permission denied.');
         });
     }
 
