@@ -1,5 +1,5 @@
 <!--
-VERSION INDEX — v1.0.1
+VERSION INDEX — v1.0.3
 - Barcode scan: native BarcodeDetector + Quagga fallback
 - Manual barcode entry
 - MusicBrainz primary lookup
@@ -19,7 +19,7 @@ VERSION INDEX — v1.0.1
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Record Barcode to CSV v1.0.1</title>
+  <title>UPC to CSV v1.0.3</title>
   <style>
     :root {
       --bg: #111827;
@@ -48,9 +48,38 @@ VERSION INDEX — v1.0.1
       padding: 24px;
     }
 
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .brand-block {
+      min-width: 0;
+    }
+
     h1 {
-      margin: 0 0 8px;
-      font-size: 32px;
+      margin: 0;
+      font-size: 36px;
+      line-height: 1.1;
+    }
+
+    .byline {
+      margin-top: 6px;
+      font-size: 16px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .logo-badge {
+      width: min(320px, 32vw);
+      min-width: 180px;
+      height: auto;
+      display: block;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45));
     }
 
     .sub {
@@ -364,6 +393,15 @@ VERSION INDEX — v1.0.1
     }
 
     @media (max-width: 980px) {
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .logo-badge {
+        width: min(280px, 70vw);
+      }
+
       .grid { grid-template-columns: 1fr; }
       .session-item { grid-template-columns: 1fr; }
     }
@@ -371,7 +409,13 @@ VERSION INDEX — v1.0.1
 </head>
 <body>
   <div class="wrap">
-    <h1>Record Barcode to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.1</span></h1>
+    <div class="topbar">
+      <div class="brand-block">
+        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.3</span></h1>
+        <div class="byline">by Decknics</div>
+      </div>
+      
+    </div>
     <div class="sub">
       Scan a UPC/EAN barcode on a record sleeve, look up the release, preview the tracks, edit fields inline, bulk-edit selected rows, delete tracks before export, batch records into one session, and export a clean CSV. MusicBrainz is used first, with Discogs as a backup when you provide a Discogs token.
     </div>
@@ -453,6 +497,7 @@ VERSION INDEX — v1.0.1
           </div>
           <div class="actions">
             <button id="applyBulkBtn" class="secondary" type="button">Apply to Selected</button>
+            <button id="bulkAddToSessionBtn" class="warning" type="button" disabled>Add to Session</button>
             <button id="deleteSelectedTracksBtn" class="danger" type="button">Delete Selected</button>
           </div>
         </div>
@@ -523,6 +568,7 @@ VERSION INDEX — v1.0.1
     const bulkBpmInput = document.getElementById('bulkBpmInput');
     const applyBulkBtn = document.getElementById('applyBulkBtn');
     const deleteSelectedTracksBtn = document.getElementById('deleteSelectedTracksBtn');
+    const bulkAddToSessionBtn = document.getElementById('bulkAddToSessionBtn');
     const selectAllTracks = document.getElementById('selectAllTracks');
 
     const KEY_OPTIONS = ['', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A', '7B', '8A', '8B', '9A', '9B', '10A', '10B', '11A', '11B', '12A', '12B'];
@@ -831,6 +877,7 @@ VERSION INDEX — v1.0.1
 
       updateCsvPreviewForCurrent();
       addToSessionBtn.disabled = false;
+      bulkAddToSessionBtn.disabled = false;
       resultCard.style.display = 'block';
     }
 
@@ -1286,6 +1333,7 @@ VERSION INDEX — v1.0.1
       currentRelease = null;
       resultCard.style.display = 'none';
       addToSessionBtn.disabled = true;
+      bulkAddToSessionBtn.disabled = true;
       downloadCsvBtn.disabled = true;
       copyCsvBtn.disabled = true;
       selectAllTracks.checked = false;
@@ -1340,6 +1388,7 @@ VERSION INDEX — v1.0.1
 
     applyBulkBtn.addEventListener('click', applyBulkEditToSelected);
     deleteSelectedTracksBtn.addEventListener('click', deleteSelectedTracks);
+    bulkAddToSessionBtn.addEventListener('click', addCurrentToSession);
     startCameraBtn.addEventListener('click', startCameraScan);
     stopCameraBtn.addEventListener('click', stopCameraScan);
     lookupBtn.addEventListener('click', doLookup);
