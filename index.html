@@ -1,27 +1,27 @@
 <!--
-VERSION INDEX — v1.1.4
+VERSION INDEX — v1.1.11
 - Barcode scan: native BarcodeDetector + Quagga fallback
 - Manual barcode entry
 - MusicBrainz primary lookup
 - Discogs backup lookup with saved token
-- Inline editing: Artist, Song, BPM, Key, Year, Genre
+- Inline editing: Artist, Album, Song, BPM, Key, Year, Genre
+- Hidden import/export-only Artwork CSV column
 - Bulk edit selected rows
-- Delete individual or selected tracks
+- Delete selected tracks
 - Empty-field highlighting
 - Batch session mode with duplicate prevention
 - CSV export: single release + full session
 - Expandable Artist/Song fields
 - Enter-to-add toggle
 - TuneBat search link per row
-- TuneBat proxy autofill with fuzzy matching
-- TuneBat search fallback when no worker is set
+- TuneBat search link per row (popup window)
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UPC to CSV v1.1.4</title>
+  <title>UPC to CSV v1.1.11</title>
   <style>
     :root {
       --bg: #111827;
@@ -394,22 +394,6 @@ VERSION INDEX — v1.1.4
       background: #2563eb;
     }
 
-    .tunebat-autofill-btn {
-      background: #0f766e;
-      color: #ccfbf1;
-      border: 0;
-      cursor: pointer;
-      padding: 8px 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .tunebat-autofill-btn:hover {
-      background: #0d9488;
-    }
-
     .delete-track-btn {
       padding: 8px 10px;
       font-size: 12px;
@@ -435,13 +419,13 @@ VERSION INDEX — v1.1.4
   <div class="wrap">
     <div class="topbar">
       <div class="brand-block">
-        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.1.4</span></h1>
+        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.1.11</span></h1>
         <div class="byline">by Decknics</div>
       </div>
       
     </div>
     <div class="sub">
-      Scan a UPC/EAN barcode on a record sleeve, look up the release, preview the tracks, edit fields inline, bulk-edit selected rows, delete tracks before export, batch records into one session, and export a clean CSV. MusicBrainz is used first, with Discogs as a backup when you provide a Discogs token. Optional TuneBat worker autofill can fuzzy-match likely BPM/key results. If no worker is set, the Auto button now opens a TuneBat search instead of trying a guessed page URL.
+      Scan a UPC/EAN barcode on a record sleeve, look up the release, preview the tracks, edit fields inline, bulk-edit selected rows, delete tracks before export, batch records into one session, and export a clean CSV. MusicBrainz is used first, with Discogs as a backup when you provide a Discogs token. Use the TuneBat search button per track to quickly look up BPM and key.
     </div>
 
     <div class="grid">
@@ -454,13 +438,6 @@ VERSION INDEX — v1.1.4
           <div style="flex:1 1 220px;">
             <label for="discogsTokenInput">Discogs User Token (optional backup)</label>
             <input id="discogsTokenInput" placeholder="Paste Discogs token for backup lookup" />
-          </div>
-        </div>
-
-        <div class="row">
-          <div style="flex:1 1 260px; min-width:240px;">
-            <label for="tunebatProxyInput">TuneBat Worker URL (optional autofill)</label>
-            <input id="tunebatProxyInput" placeholder="https://your-worker.example.workers.dev (optional)" />
           </div>
         </div>
 
@@ -495,7 +472,7 @@ VERSION INDEX — v1.1.4
         </div>
         <textarea id="csvPreview" rows="18" placeholder="Your CSV will appear here..."></textarea>
         <div class="small">
-          Format: Artist, Song, Bpm, Key, Year, Genre
+          Format: Artist, Album, Song, Bpm, Key, Year, Genre, Artwork
         </div>
       </div>
     </div>
@@ -509,6 +486,10 @@ VERSION INDEX — v1.1.4
           <div class="field">
             <label for="bulkArtistInput">Artist</label>
             <input id="bulkArtistInput" placeholder="Set artist" />
+          </div>
+          <div class="field">
+            <label for="bulkAlbumInput">Album</label>
+            <input id="bulkAlbumInput" placeholder="Set album" />
           </div>
           <div class="field">
             <label for="bulkYearInput">Year</label>
@@ -541,12 +522,13 @@ VERSION INDEX — v1.1.4
               <th style="width:70px;">Track #</th>
               <th style="width:180px;">Artist</th>
               <th>Song</th>
+              <th style="width:180px;">Album</th>
               <th style="width:100px;">BPM</th>
               <th style="width:85px;">Key</th>
               <th style="width:90px;">Year</th>
               <th style="width:130px;">Genre</th>
               <th style="width:100px;">TuneBat</th>
-              <th style="width:90px;">Delete</th>
+              
             </tr>
           </thead>
           <tbody id="trackTableBody"></tbody>
@@ -573,7 +555,6 @@ VERSION INDEX — v1.1.4
   <script>
     const barcodeInput = document.getElementById('barcodeInput');
     const discogsTokenInput = document.getElementById('discogsTokenInput');
-    const tunebatProxyInput = document.getElementById('tunebatProxyInput');
     const startCameraBtn = document.getElementById('startCameraBtn');
     const stopCameraBtn = document.getElementById('stopCameraBtn');
     const lookupBtn = document.getElementById('lookupBtn');
@@ -595,6 +576,7 @@ VERSION INDEX — v1.1.4
     const sessionListEl = document.getElementById('sessionList');
     const sessionSummaryEl = document.getElementById('sessionSummary');
     const bulkArtistInput = document.getElementById('bulkArtistInput');
+    const bulkAlbumInput = document.getElementById('bulkAlbumInput');
     const bulkYearInput = document.getElementById('bulkYearInput');
     const bulkGenreInput = document.getElementById('bulkGenreInput');
     const bulkKeySelect = document.getElementById('bulkKeySelect');
@@ -616,7 +598,6 @@ VERSION INDEX — v1.1.4
 
     const DISCOGS_TOKEN_STORAGE_KEY = 'recordBarcodeCsv_discogsToken';
     const ENTER_ADDS_STORAGE_KEY = 'recordBarcodeCsv_enterAddsToSession';
-    const TUNEBAT_PROXY_STORAGE_KEY = 'recordBarcodeCsv_tunebatProxy';
 
     function populateBulkKeySelect() {
       bulkKeySelect.innerHTML = '';
@@ -650,16 +631,18 @@ VERSION INDEX — v1.1.4
     }
 
     function buildCsvFromReleases(releases) {
-      const rows = [['Artist', 'Song', 'Bpm', 'Key', 'Year', 'Genre']];
+      const rows = [['Artist', 'Album', 'Song', 'Bpm', 'Key', 'Year', 'Genre', 'Artwork']];
       releases.forEach((release) => {
         (release.tracks || []).forEach((track) => {
           rows.push([
             track.artist || release.artist || '',
+            track.album || release.title || '',
             track.title || '',
             track.bpm || '',
             track.key || '',
             track.year || release.year || '',
-            track.genre || release.genre || ''
+            track.genre || release.genre || '',
+            track.artwork || release.artwork || ''
           ]);
         });
       });
@@ -763,6 +746,7 @@ VERSION INDEX — v1.1.4
 
     function clearBulkInputs() {
       bulkArtistInput.value = '';
+      bulkAlbumInput.value = '';
       bulkYearInput.value = '';
       bulkGenreInput.value = '';
       bulkKeySelect.value = '';
@@ -807,6 +791,12 @@ VERSION INDEX — v1.1.4
       return input;
     }
 
+    function createAlbumInput(value, trackIndex) {
+      const input = createTextInput(value, trackIndex, 'album', 'Album');
+      input.classList.add('expandable-input');
+      return input;
+    }
+
     function createSongInput(value, trackIndex) {
       const input = createTextInput(value, trackIndex, 'title', 'Song');
       input.classList.add('expandable-input');
@@ -822,181 +812,6 @@ VERSION INDEX — v1.1.4
     function createGenreInput(value, trackIndex) {
       return createTextInput(value, trackIndex, 'genre', 'Genre');
     }
-
-    function normalizeSearchText(value) {
-      const aliasPairs = [
-        ['remix', 'mix'],
-        ['re-edit', 'edit'],
-        ['rework', 'mix'],
-        ['version', 'mix'],
-        ['feat.', 'featuring'],
-        ['feat', 'featuring'],
-        ['ft.', 'featuring'],
-        ['ft', 'featuring']
-      ];
-      let text = String(value || '').toLowerCase().replaceAll('&', ' and ');
-      aliasPairs.forEach(([fromText, toText]) => {
-        text = text.replaceAll(fromText, toText);
-      });
-      let cleaned = '';
-      for (const ch of text) {
-        const code = ch.charCodeAt(0);
-        const isLetter = code >= 97 && code <= 122;
-        const isNumber = code >= 48 && code <= 57;
-        cleaned += (isLetter || isNumber) ? ch : ' ';
-      }
-      return cleaned.split(' ').filter(Boolean).join(' ');
-    }
-
-    function tokenizeForMatch(value) {
-      return normalizeSearchText(value).split(' ').filter(Boolean);
-    }
-
-    function levenshtein(a, b) {
-      const m = a.length;
-      const n = b.length;
-      const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-      for (let i = 0; i <= m; i += 1) dp[i][0] = i;
-      for (let j = 0; j <= n; j += 1) dp[0][j] = j;
-      for (let i = 1; i <= m; i += 1) {
-        for (let j = 1; j <= n; j += 1) {
-          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-          dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
-        }
-      }
-      return dp[m][n];
-    }
-
-    function similarityScore(a, b) {
-      const left = normalizeSearchText(a);
-      const right = normalizeSearchText(b);
-      if (!left && !right) return 1;
-      if (!left || !right) return 0;
-      if (left === right) return 1;
-      const distance = levenshtein(left, right);
-      return 1 - distance / Math.max(left.length, right.length, 1);
-    }
-
-    function tokenOverlapScore(a, b) {
-      const left = new Set(tokenizeForMatch(a));
-      const right = new Set(tokenizeForMatch(b));
-      if (!left.size || !right.size) return 0;
-      let overlap = 0;
-      left.forEach((token) => {
-        if (right.has(token)) overlap += 1;
-      });
-      return overlap / Math.max(left.size, right.size);
-    }
-
-    function normalizeTunebatSlugPart(value) {
-      return String(value || '')
-        .toLowerCase()
-        .replace(/&/g, ' and ')
-        .replace(/feat\.?/g, ' ')
-        .replace(/ft\.?/g, ' ')
-        .replace(/\([^)]*\)/g, ' ')
-        .replace(/\[[^\]]*\]/g, ' ')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-    }
-
-    function buildTuneBatSearchUrl(artist, title) {
-      const query = [artist, title].filter(Boolean).join(' ').trim();
-      return query ? `https://tunebat.com/Search?q=${encodeURIComponent(query)}` : '';
-    }
-
-    function openTuneBatWindow(url) {
-      window.open(url, 'tunebatPopup', 'width=900,height=700,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
-    }
-
-    function openTuneBatGuessFallback(artist, title) {
-      const searchUrl = buildTuneBatSearchUrl(artist, title);
-      if (!searchUrl) {
-        setStatus('Enter an artist or song title first for TuneBat.');
-        return;
-      }
-      openTuneBatWindow(searchUrl);
-      setLookupNotice('warning', 'Opened TuneBat search popup.');
-      setStatus('Opened TuneBat search popup.');
-    }
-
-    function chooseBestTunebatCandidate(rowArtist, rowTitle, candidates) {
-      const scored = candidates.map((candidate) => {
-        const artistScore = Math.max(similarityScore(rowArtist, candidate.artist || ''), tokenOverlapScore(rowArtist, candidate.artist || ''));
-        const titleScore = Math.max(similarityScore(rowTitle, candidate.title || ''), tokenOverlapScore(rowTitle, candidate.title || ''));
-        return { candidate, score: (artistScore * 0.45) + (titleScore * 0.55) };
-      });
-      scored.sort((a, b) => b.score - a.score);
-      return scored[0] || null;
-    }
-
-    async function fetchTunebatCandidates(rowArtist, rowTitle) {
-      const proxyUrl = tunebatProxyInput.value.trim();
-      if (!proxyUrl) throw new Error('No TuneBat worker URL is set.');
-      const url = new URL(proxyUrl);
-      url.searchParams.set('artist', rowArtist || '');
-      url.searchParams.set('title', rowTitle || '');
-      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`TuneBat proxy failed (${response.status})`);
-      const data = await response.json();
-      const candidates = Array.isArray(data?.results) ? data.results : [];
-      if (!candidates.length) throw new Error('No TuneBat matches returned by the proxy.');
-      return candidates;
-    }
-
-    async function autofillTunebatForTrack(trackIndex, release) {
-      const rowArtistInput = trackTableBody.querySelector(`input[data-track-index="${trackIndex}"][data-field="artist"]`);
-      const rowTitleInput = trackTableBody.querySelector(`input[data-track-index="${trackIndex}"][data-field="title"]`);
-      const rowBpmInput = trackTableBody.querySelector(`input[data-track-index="${trackIndex}"][data-field="bpm"]`);
-      const rowKeySelect = trackTableBody.querySelector(`[data-track-index="${trackIndex}"][data-field="key"]`);
-      const rowArtist = (rowArtistInput?.value || release.artist || '').trim();
-      const rowTitle = (rowTitleInput?.value || '').trim();
-      if (!rowArtist && !rowTitle) {
-        setStatus('Enter artist and song first before TuneBat autofill.');
-        return;
-      }
-      const workerUrl = tunebatProxyInput.value.trim();
-      if (!workerUrl) {
-        openTuneBatGuessFallback(rowArtist, rowTitle);
-        return;
-      }
-      try {
-        new URL(workerUrl);
-      } catch (error) {
-        tunebatProxyInput.value = '';
-        savePreferences();
-        openTuneBatGuessFallback(rowArtist, rowTitle);
-        setLookupNotice('warning', 'TuneBat Worker URL was invalid, so I opened a TuneBat search popup instead.');
-        setStatus('Opened TuneBat search popup.');
-        return;
-      }
-      const autofillButton = trackTableBody.querySelector(`button[data-action="tunebat-autofill"][data-track-index="${trackIndex}"]`);
-      if (autofillButton) autofillButton.disabled = true;
-      try {
-        setStatus(`Searching TuneBat for ${[rowArtist, rowTitle].filter(Boolean).join(' - ')}...`);
-        const candidates = await fetchTunebatCandidates(rowArtist, rowTitle);
-        const best = chooseBestTunebatCandidate(rowArtist, rowTitle, candidates);
-        if (!best || best.score < 0.45) throw new Error('No close TuneBat match was confident enough to auto-fill.');
-        const bpmValue = best.candidate.bpm != null ? String(best.candidate.bpm) : '';
-        const keyValue = String(best.candidate.key || '').trim();
-        if (rowBpmInput && bpmValue) rowBpmInput.value = bpmValue;
-        if (rowKeySelect && keyValue) rowKeySelect.value = KEY_OPTIONS.includes(keyValue) ? keyValue : '';
-        syncCurrentReleaseEdits();
-        applyCurrentReleaseBackToSessionIfDuplicateFound();
-        refreshEmptyFieldHighlighting();
-        setLookupNotice('success', `TuneBat autofill matched: ${best.candidate.artist || ''} - ${best.candidate.title || ''} (score ${(best.score * 100).toFixed(0)}%).`);
-        setStatus('TuneBat autofill complete.');
-      } catch (error) {
-        console.error(error);
-        setLookupNotice('warning', (error.message || 'TuneBat autofill failed.') + ' Opening a direct TuneBat guess instead.');
-        setStatus('TuneBat autofill failed.');
-        openTuneBatGuessFallback(rowArtist, rowTitle);
-      } finally {
-        if (autofillButton) autofillButton.disabled = false;
-      }
-    }
-
     function createTuneBatLink(track, release, trackIndex) {
       const link = document.createElement('a');
       link.className = 'tunebat-link';
@@ -1032,16 +847,6 @@ VERSION INDEX — v1.1.4
       const wrap = document.createElement('div');
       wrap.className = 'tunebat-actions';
       wrap.appendChild(createTuneBatLink(track, release, trackIndex));
-
-      const autofillButton = document.createElement('button');
-      autofillButton.type = 'button';
-      autofillButton.className = 'tunebat-autofill-btn';
-      autofillButton.textContent = 'Auto';
-      autofillButton.dataset.action = 'tunebat-autofill';
-      autofillButton.dataset.trackIndex = String(trackIndex);
-      autofillButton.addEventListener('click', () => autofillTunebatForTrack(trackIndex, release));
-      wrap.appendChild(autofillButton);
-
       return wrap;
     }
 
@@ -1055,10 +860,13 @@ VERSION INDEX — v1.1.4
         country: '',
         barcode: '',
         lookupSource: 'manual',
+        artwork: '',
         tracks: [{
           number: '1',
           title: '',
           artist: '',
+          album: '',
+          artwork: '',
           bpm: '',
           key: '',
           year: '',
@@ -1112,6 +920,10 @@ VERSION INDEX — v1.1.4
         tdArtist.className = 'expandable-cell';
         tdArtist.appendChild(createArtistInput(track.artist || release.artist || '', index));
 
+        const tdAlbum = document.createElement('td');
+        tdAlbum.className = 'expandable-cell';
+        tdAlbum.appendChild(createAlbumInput(track.album || release.title || '', index));
+
         const tdTitle = document.createElement('td');
         tdTitle.className = 'expandable-cell';
         tdTitle.appendChild(createSongInput(track.title || '', index));
@@ -1131,25 +943,18 @@ VERSION INDEX — v1.1.4
         const tdTuneBat = document.createElement('td');
         tdTuneBat.appendChild(createTuneBatActions(track, release, index));
 
-        const tdDelete = document.createElement('td');
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'danger delete-track-btn';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.dataset.action = 'delete-track';
-        deleteBtn.dataset.trackIndex = String(index);
-        tdDelete.appendChild(deleteBtn);
+        
 
         tr.appendChild(tdSelect);
         tr.appendChild(tdNumber);
         tr.appendChild(tdArtist);
         tr.appendChild(tdTitle);
+        tr.appendChild(tdAlbum);
         tr.appendChild(tdBpm);
         tr.appendChild(tdKey);
         tr.appendChild(tdYear);
         tr.appendChild(tdGenre);
         tr.appendChild(tdTuneBat);
-        tr.appendChild(tdDelete);
         trackTableBody.appendChild(tr);
       });
 
@@ -1245,7 +1050,8 @@ VERSION INDEX — v1.1.4
           country: '',
           barcode: '',
           tracks: [],
-          lookupSource: 'manual'
+          lookupSource: 'manual',
+          artwork: ''
         };
       } else {
         syncCurrentReleaseEdits();
@@ -1255,6 +1061,8 @@ VERSION INDEX — v1.1.4
         number: String((currentRelease.tracks || []).length + 1),
         title: '',
         artist: '',
+        album: '',
+        artwork: '',
         bpm: '',
         key: '',
         year: '',
@@ -1306,6 +1114,7 @@ VERSION INDEX — v1.1.4
 
       const updates = {
         artist: bulkArtistInput.value.trim(),
+        album: bulkAlbumInput.value.trim(),
         year: bulkYearInput.value.trim(),
         genre: bulkGenreInput.value.trim(),
         key: bulkKeySelect.value.trim(),
@@ -1372,6 +1181,8 @@ VERSION INDEX — v1.1.4
             number: track.number || '',
             title: track.title || '',
             artist: artist || '',
+            album: detail.title || '',
+            artwork: '',
             bpm: '',
             key: '',
             year: '',
@@ -1384,6 +1195,7 @@ VERSION INDEX — v1.1.4
       return {
         title: detail.title || '',
         artist: artist || '',
+        artwork: '',
         date: detail.date || '',
         year: (detail.date || '').slice(0, 4),
         genre: '',
@@ -1424,6 +1236,7 @@ VERSION INDEX — v1.1.4
       return {
         title: detail.title || '',
         artist: artist || '',
+        artwork: '',
         date: year,
         year,
         genre: primaryGenre,
@@ -1434,6 +1247,8 @@ VERSION INDEX — v1.1.4
           number: track.position || '',
           title: track.title || '',
           artist: artist || '',
+          album: detail.title || '',
+          artwork: '',
           bpm: '',
           key: '',
           year,
@@ -1624,7 +1439,6 @@ VERSION INDEX — v1.1.4
       try {
         localStorage.setItem(DISCOGS_TOKEN_STORAGE_KEY, discogsTokenInput.value.trim());
         localStorage.setItem(ENTER_ADDS_STORAGE_KEY, enterAddsToSessionToggle.checked ? '1' : '0');
-        localStorage.setItem(TUNEBAT_PROXY_STORAGE_KEY, tunebatProxyInput.value.trim());
       } catch (error) {
         console.error('Could not save preferences.', error);
       }
@@ -1634,17 +1448,6 @@ VERSION INDEX — v1.1.4
       try {
         const savedToken = localStorage.getItem(DISCOGS_TOKEN_STORAGE_KEY);
         const savedEnterAdds = localStorage.getItem(ENTER_ADDS_STORAGE_KEY);
-        const savedTunebatProxy = localStorage.getItem(TUNEBAT_PROXY_STORAGE_KEY);
-        if (savedToken) discogsTokenInput.value = savedToken;
-        if (savedTunebatProxy) {
-          try {
-            new URL(savedTunebatProxy);
-            tunebatProxyInput.value = savedTunebatProxy;
-          } catch (error) {
-            localStorage.removeItem(TUNEBAT_PROXY_STORAGE_KEY);
-            tunebatProxyInput.value = '';
-          }
-        }
         enterAddsToSessionToggle.checked = savedEnterAdds === '1';
       } catch (error) {
         console.error('Could not load preferences.', error);
@@ -1722,7 +1525,6 @@ VERSION INDEX — v1.1.4
       if (e.key === 'Enter') doLookup();
     });
     discogsTokenInput.addEventListener('input', savePreferences);
-    tunebatProxyInput.addEventListener('input', savePreferences);
     enterAddsToSessionToggle.addEventListener('change', savePreferences);
     document.addEventListener('keydown', handlePrimaryEnterShortcut);
 
