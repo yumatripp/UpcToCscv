@@ -1,5 +1,5 @@
 <!--
-VERSION INDEX — v1.0.3
+VERSION INDEX — v1.0.3a
 - Barcode scan: native BarcodeDetector + Quagga fallback
 - Manual barcode entry
 - MusicBrainz primary lookup
@@ -19,7 +19,7 @@ VERSION INDEX — v1.0.3
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UPC to CSV v1.0.3</title>
+  <title>UPC to CSV v1.0.3a</title>
   <style>
     :root {
       --bg: #111827;
@@ -411,7 +411,7 @@ VERSION INDEX — v1.0.3
   <div class="wrap">
     <div class="topbar">
       <div class="brand-block">
-        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.3</span></h1>
+        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.3a</span></h1>
         <div class="byline">by Decknics</div>
       </div>
       
@@ -469,10 +469,10 @@ VERSION INDEX — v1.0.3
       </div>
     </div>
 
-    <div id="resultCard" class="card" style="margin-top:20px; display:none;">
+    <div id="resultCard" class="card" style="margin-top:20px; display:block;">
       <div class="album">
-        <h3 id="albumTitle">Album title</h3>
-        <div id="albumMeta" class="meta"></div>
+        <h3 id="albumTitle">Current Release</h3>
+        <div id="albumMeta" class="meta">No release loaded yet. Click Add Track to start a manual entry, or look up a release first.</div>
 
         <div class="bulk-tools">
           <div class="field">
@@ -499,6 +499,7 @@ VERSION INDEX — v1.0.3
             <button id="applyBulkBtn" class="secondary" type="button">Apply to Selected</button>
             <button id="bulkAddToSessionBtn" class="warning" type="button" disabled>Add to Session</button>
             <button id="deleteSelectedTracksBtn" class="danger" type="button">Delete Selected</button>
+            <button id="addManualTrackBtn" class="ghost" type="button">Add Track</button>
           </div>
         </div>
 
@@ -568,6 +569,7 @@ VERSION INDEX — v1.0.3
     const bulkBpmInput = document.getElementById('bulkBpmInput');
     const applyBulkBtn = document.getElementById('applyBulkBtn');
     const deleteSelectedTracksBtn = document.getElementById('deleteSelectedTracksBtn');
+    const addManualTrackBtn = document.getElementById('addManualTrackBtn');
     const bulkAddToSessionBtn = document.getElementById('bulkAddToSessionBtn');
     const selectAllTracks = document.getElementById('selectAllTracks');
 
@@ -806,10 +808,24 @@ VERSION INDEX — v1.0.3
       return link;
     }
 
+    function renderEmptyReleaseEditor() {
+      albumTitleEl.textContent = 'Current Release';
+      albumMetaEl.textContent = 'No release loaded yet. Click Add Track to start a manual entry, or look up a release first.';
+      trackTableBody.innerHTML = '';
+      csvPreview.value = '';
+      lastCsv = '';
+      selectAllTracks.checked = false;
+      selectAllTracks.indeterminate = false;
+      addToSessionBtn.disabled = true;
+      bulkAddToSessionBtn.disabled = true;
+      downloadCsvBtn.disabled = true;
+      copyCsvBtn.disabled = true;
+    }
+
     function renderRelease(release) {
       currentRelease = release;
       albumTitleEl.textContent = release.title || 'Unknown Release';
-      const sourceText = release.lookupSource === 'discogs' ? 'Discogs backup' : 'MusicBrainz';
+      const sourceText = release.lookupSource === 'discogs' ? 'Discogs backup' : release.lookupSource === 'manual' ? 'Manual' : 'MusicBrainz';
       albumMetaEl.innerHTML = `${release.artist || 'Unknown Artist'}${release.date ? ' • ' + release.date : ''}${release.country ? ' • ' + release.country : ''}${release.barcode ? ' • UPC ' + release.barcode : ''}<span class="source-badge">${sourceText}</span>`;
       trackTableBody.innerHTML = '';
       selectAllTracks.checked = false;
@@ -901,7 +917,7 @@ VERSION INDEX — v1.0.3
         item.className = 'session-item';
 
         const left = document.createElement('div');
-        const source = release.lookupSource === 'discogs' ? 'Discogs backup' : 'MusicBrainz';
+        const source = release.lookupSource === 'discogs' ? 'Discogs backup' : release.lookupSource === 'manual' ? 'Manual' : 'MusicBrainz';
         left.innerHTML = `<strong>${release.artist || 'Unknown Artist'} - ${release.title || 'Unknown Release'}</strong><span class="source-badge">${source}</span><div class="small">${release.barcode ? 'UPC ' + release.barcode + ' • ' : ''}${release.tracks.length} track(s)</div>`;
 
         const loadBtn = document.createElement('button');
@@ -954,6 +970,43 @@ VERSION INDEX — v1.0.3
         sessionReleases[sessionIndex] = deepClone(currentRelease);
         renderSession();
       }
+    }
+
+    function addManualTrack() {
+      if (!currentRelease) {
+        currentRelease = {
+          title: '',
+          artist: '',
+          date: '',
+          year: '',
+          genre: '',
+          country: '',
+          barcode: '',
+          tracks: [],
+          lookupSource: 'manual'
+        };
+      } else {
+        syncCurrentReleaseEdits();
+      }
+
+      currentRelease.tracks.push({
+        number: String((currentRelease.tracks || []).length + 1),
+        title: '',
+        artist: '',
+        bpm: '',
+        key: '',
+        year: '',
+        genre: ''
+      });
+
+      renumberTracks(currentRelease.tracks);
+      renderRelease(currentRelease);
+      const newIndex = currentRelease.tracks.length - 1;
+      const newTitleInput = trackTableBody.querySelector(`input[data-track-index="${newIndex}"][data-field="title"]`);
+      if (newTitleInput) newTitleInput.focus();
+      applyCurrentReleaseBackToSessionIfDuplicateFound();
+      setLookupNotice('success', 'Blank track added. Fill in any fields you want, then add it to the batch session.');
+      setStatus('Manual track added.');
     }
 
     function renumberTracks(tracks) {
@@ -1331,11 +1384,7 @@ VERSION INDEX — v1.0.3
       csvPreview.value = '';
       lastCsv = '';
       currentRelease = null;
-      resultCard.style.display = 'none';
-      addToSessionBtn.disabled = true;
-      bulkAddToSessionBtn.disabled = true;
-      downloadCsvBtn.disabled = true;
-      copyCsvBtn.disabled = true;
+      renderEmptyReleaseEditor();
       selectAllTracks.checked = false;
       selectAllTracks.indeterminate = false;
       clearBulkInputs();
@@ -1388,6 +1437,7 @@ VERSION INDEX — v1.0.3
 
     applyBulkBtn.addEventListener('click', applyBulkEditToSelected);
     deleteSelectedTracksBtn.addEventListener('click', deleteSelectedTracks);
+    addManualTrackBtn.addEventListener('click', addManualTrack);
     bulkAddToSessionBtn.addEventListener('click', addCurrentToSession);
     startCameraBtn.addEventListener('click', startCameraScan);
     stopCameraBtn.addEventListener('click', stopCameraScan);
@@ -1407,6 +1457,7 @@ VERSION INDEX — v1.0.3
 
     populateBulkKeySelect();
     loadPreferences();
+    renderEmptyReleaseEditor();
     renderSession();
   </script>
   <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
