@@ -1,3 +1,19 @@
+<!--
+VERSION INDEX — v1.0.1
+- Barcode scan: native BarcodeDetector + Quagga fallback
+- Manual barcode entry
+- MusicBrainz primary lookup
+- Discogs backup lookup with saved token
+- Inline editing: Artist, Song, BPM, Key, Year, Genre
+- Bulk edit selected rows
+- Delete individual or selected tracks
+- Empty-field highlighting
+- Batch session mode with duplicate prevention
+- CSV export: single release + full session
+- Expandable Artist/Song fields
+- Enter-to-add toggle
+- TuneBat search link per row
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -323,6 +339,24 @@
       box-shadow: 0 0 0 1px var(--accent), 0 10px 24px rgba(0,0,0,0.65);
     }
 
+    .tunebat-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #1e40af;
+      color: #dbeafe;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tunebat-link:hover {
+      background: #2563eb;
+    }
+
     .delete-track-btn {
       padding: 8px 10px;
       font-size: 12px;
@@ -434,6 +468,7 @@
               <th style="width:85px;">Key</th>
               <th style="width:90px;">Year</th>
               <th style="width:130px;">Genre</th>
+              <th style="width:100px;">TuneBat</th>
               <th style="width:90px;">Delete</th>
             </tr>
           </thead>
@@ -707,6 +742,24 @@
       return createTextInput(value, trackIndex, 'genre', 'Genre');
     }
 
+    function createTuneBatLink(track, release) {
+      const link = document.createElement('a');
+      const query = [track.artist || release.artist || '', track.title || ''].filter(Boolean).join(' ');
+      link.className = 'tunebat-link';
+      link.href = `https://tunebat.com/Search?q=${encodeURIComponent(query)}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Search';
+
+      // Force new window behavior across browsers
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.open(link.href, 'tunebatPopup', 'width=900,height=700,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
+      });
+
+      return link;
+    }
+
     function renderRelease(release) {
       currentRelease = release;
       albumTitleEl.textContent = release.title || 'Unknown Release';
@@ -751,6 +804,9 @@
         const tdGenre = document.createElement('td');
         tdGenre.appendChild(createGenreInput(track.genre || release.genre || '', index));
 
+        const tdTuneBat = document.createElement('td');
+        tdTuneBat.appendChild(createTuneBatLink(track, release));
+
         const tdDelete = document.createElement('td');
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
@@ -768,6 +824,7 @@
         tr.appendChild(tdKey);
         tr.appendChild(tdYear);
         tr.appendChild(tdGenre);
+        tr.appendChild(tdTuneBat);
         tr.appendChild(tdDelete);
         trackTableBody.appendChild(tr);
       });
