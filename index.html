@@ -1,5 +1,5 @@
 <!--
-VERSION INDEX — v1.1.11
+VERSION INDEX — v1.1.12
 - Barcode scan: native BarcodeDetector + Quagga fallback
 - Manual barcode entry
 - MusicBrainz primary lookup
@@ -21,7 +21,7 @@ VERSION INDEX — v1.1.11
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UPC to CSV v1.1.11</title>
+  <title>UPC to CSV v1.1.12</title>
   <style>
     :root {
       --bg: #111827;
@@ -419,7 +419,7 @@ VERSION INDEX — v1.1.11
   <div class="wrap">
     <div class="topbar">
       <div class="brand-block">
-        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.1.11</span></h1>
+        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.1.12</span></h1>
         <div class="byline">by Decknics</div>
       </div>
       
@@ -812,6 +812,11 @@ VERSION INDEX — v1.1.11
     function createGenreInput(value, trackIndex) {
       return createTextInput(value, trackIndex, 'genre', 'Genre');
     }
+
+    function openTuneBatWindow(url) {
+      window.open(url, 'tunebatPopup', 'width=900,height=700,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
+    }
+
     function createTuneBatLink(track, release, trackIndex) {
       const link = document.createElement('a');
       link.className = 'tunebat-link';
