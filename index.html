@@ -1,5 +1,5 @@
 <!--
-VERSION INDEX — v1.0.3a
+VERSION INDEX — v1.0.3b
 - Barcode scan: native BarcodeDetector + Quagga fallback
 - Manual barcode entry
 - MusicBrainz primary lookup
@@ -19,7 +19,7 @@ VERSION INDEX — v1.0.3a
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UPC to CSV v1.0.3a</title>
+  <title>UPC to CSV v1.0.3b</title>
   <style>
     :root {
       --bg: #111827;
@@ -411,7 +411,7 @@ VERSION INDEX — v1.0.3a
   <div class="wrap">
     <div class="topbar">
       <div class="brand-block">
-        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.3a</span></h1>
+        <h1>UPC to CSV <span style="font-size:16px; color:#9ca3af; font-weight:600;">v1.0.3b</span></h1>
         <div class="byline">by Decknics</div>
       </div>
       
@@ -790,22 +790,59 @@ VERSION INDEX — v1.0.3a
       return createTextInput(value, trackIndex, 'genre', 'Genre');
     }
 
-    function createTuneBatLink(track, release) {
+    function createTuneBatLink(track, release, trackIndex) {
       const link = document.createElement('a');
-      const query = [track.artist || release.artist || '', track.title || ''].filter(Boolean).join(' ');
       link.className = 'tunebat-link';
-      link.href = `https://tunebat.com/Search?q=${encodeURIComponent(query)}`;
+      link.href = '#';
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = 'Search';
+      link.dataset.trackIndex = String(trackIndex);
 
-      // Force new window behavior across browsers
       link.addEventListener('click', (e) => {
         e.preventDefault();
-        window.open(link.href, 'tunebatPopup', 'width=900,height=700,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
+
+        const rowArtistInput = trackTableBody.querySelector(`input[data-track-index="${trackIndex}"][data-field="artist"]`);
+        const rowTitleInput = trackTableBody.querySelector(`input[data-track-index="${trackIndex}"][data-field="title"]`);
+        const artist = (rowArtistInput?.value || release.artist || '').trim();
+        const title = (rowTitleInput?.value || '').trim();
+        const query = [artist, title].filter(Boolean).join(' ');
+
+        if (!query) {
+          setStatus('Enter an artist or song title first for TuneBat search.');
+          return;
+        }
+
+        const searchUrl = `https://tunebat.com/Search?q=${encodeURIComponent(query)}`;
+        window.open(searchUrl, 'tunebatPopup', 'width=900,height=700,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes');
       });
 
       return link;
+    }
+
+    function initManualReleaseWithOneTrack() {
+      currentRelease = {
+        title: '',
+        artist: '',
+        date: '',
+        year: '',
+        genre: '',
+        country: '',
+        barcode: '',
+        lookupSource: 'manual',
+        tracks: [{
+          number: '1',
+          title: '',
+          artist: '',
+          bpm: '',
+          key: '',
+          year: '',
+          genre: ''
+        }]
+      };
+      renderRelease(currentRelease);
+      setLookupNotice('', '');
+      setStatus('Ready. Added one blank track.');
     }
 
     function renderEmptyReleaseEditor() {
@@ -867,7 +904,7 @@ VERSION INDEX — v1.0.3a
         tdGenre.appendChild(createGenreInput(track.genre || release.genre || '', index));
 
         const tdTuneBat = document.createElement('td');
-        tdTuneBat.appendChild(createTuneBatLink(track, release));
+        tdTuneBat.appendChild(createTuneBatLink(track, release, index));
 
         const tdDelete = document.createElement('td');
         const deleteBtn = document.createElement('button');
@@ -1384,12 +1421,9 @@ VERSION INDEX — v1.0.3a
       csvPreview.value = '';
       lastCsv = '';
       currentRelease = null;
-      renderEmptyReleaseEditor();
-      selectAllTracks.checked = false;
-      selectAllTracks.indeterminate = false;
       clearBulkInputs();
       setLookupNotice('', '');
-      setStatus('Cleared current release.');
+      initManualReleaseWithOneTrack();
       barcodeInput.focus();
     }
 
@@ -1457,7 +1491,7 @@ VERSION INDEX — v1.0.3a
 
     populateBulkKeySelect();
     loadPreferences();
-    renderEmptyReleaseEditor();
+    initManualReleaseWithOneTrack();
     renderSession();
   </script>
   <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
